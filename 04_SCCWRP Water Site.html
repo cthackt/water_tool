@@ -433,6 +433,12 @@
         };
       };
       function retrieveData(station, origin_fname, datatype, url) {
+        console.log("retrieveData() called")
+        console.log("---------------------");
+        console.log("retrieveData() INPUT DATA:");
+        inputData = `station: ${station}, origin_fname: ${origin_fname}, url: ${url}`;
+        console.log(inputData);
+
         h4 = ""
         table = document.createElement("table"),
           h4 = document.createElement("h4"),
@@ -443,7 +449,17 @@
         search_url = url + "/query?where=" + origin_fname + "='" + station + "'&outFields=*&f=json";
         console.log("search_url:" + search_url);
         protocol = "GET";
-        fetch(search_url, { method: protocol, cache: "no-cache", }).then(function (response) { return response.json(); }).then(function (data) { console.log(data); formatTable(station, origin_fname, datatype, data); }).catch(function (err) { console.log("We had a problem Houston", err); });
+        fetch(search_url, { method: protocol, cache: "no-cache", })
+          .then(function (response) {
+             return response.json(); 
+            })
+            .then(function (data) { 
+              console.log(data); 
+              formatTable(station, origin_fname, datatype, data); 
+            })
+              .catch(function (err) { 
+                console.log("We had a problem Houston", err); 
+              });
       };
 
 
@@ -532,7 +548,7 @@
         console.log("water_checkboxFieldset")
         water_checkboxFieldset.innerHTML = `<legend> Datasets From Watershed Query: </legend>`;
         water_checklist.forEach(item => {
-          water_checkboxFieldset.innerHTML += `<label><input class = "stationChecked" type="checkbox">${item}</label>`
+          water_checkboxFieldset.innerHTML += `<label><input class = "stationChecked" type="checkbox" value="${item}">${item}</label>`
         });
         console.log(water_checkboxFieldset);
 
@@ -629,7 +645,7 @@
         console.log("County_checkboxFieldset")
         county_checkboxFieldset.innerHTML = `<legend> Datasets From County Query: </legend>`;
         county_checklist.forEach(item => {
-          county_checkboxFieldset.innerHTML += `<label><input class = "stationChecked" type="checkbox">${item}</label>`
+          county_checkboxFieldset.innerHTML += `<label><input class = "stationChecked" type="checkbox" value="${item}">${item}</label>`
         });
         console.log(county_checkboxFieldset);
 
@@ -730,7 +746,7 @@
         console.log("bight_checkboxFieldset")
         bight_checkboxFieldset.innerHTML = `<legend> Datasets From Bight Query: </legend>`;
         bight_checklist.forEach(item => {
-          bight_checkboxFieldset.innerHTML += `<label><input class = "stationChecked" type="checkbox">${item}</label>`
+          bight_checkboxFieldset.innerHTML += `<label><input class = "stationChecked" type="checkbox"  value="${item}">${item}</label>`
         });
         console.log(bight_checkboxFieldset);
 
@@ -849,7 +865,7 @@
         const checkboxFieldset = document.querySelector('#results > fieldset');
         checkboxFieldset.innerHTML = `<legend> Datasets From Point Buffer Query:</legend>`;
         buffer_checklist.forEach(item => {
-          checkboxFieldset.innerHTML += `<label><input class = "stationChecked" type="checkbox">${item}</label>`
+          checkboxFieldset.innerHTML += `<label><input class = "stationChecked" type="checkbox" value="${item}">${item}</label>`
         });
         console.log(checkboxFieldset);
       });
@@ -867,13 +883,14 @@
           }
         };
 
-        console.log("stationChecked");
-        console.log(checkedStations);
+        console.log("stationChecked:");
+        console.log("---------------");
+        checkedStations.forEach(el => console.log(el));
 
         console.log("On To The Next Part...");
         str = " ";
         checkedStations.forEach(function (item, index) {
-          console.log(item);
+          console.log(`item: ${item}`);
           str += retrieveData(item.stationid, item.origin_fname, item.dtp, item.link);
         });
 
