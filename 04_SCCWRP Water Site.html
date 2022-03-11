@@ -102,6 +102,8 @@
     let bightLayerView;
     let waterLayerView;
 
+    var datasetParameter;
+
     require([
       "esri/Map",
       "esri/Graphic",
@@ -353,8 +355,8 @@
       // Take that new map we just made above and display it
       var view = new MapView({
         container: "viewDiv",
-        center: [-118.243683, 36.052235],
-        zoom: 6,
+        center: [-117.92301954784965, 34.04278782594901],
+        zoom: 8,
         map: map,
         popup: {
           autoOpenEnabled: false,
@@ -491,6 +493,7 @@
 
           // Highlight the watershed polygon area returned from the first query
           view.whenLayerView(watersheds).then(function (layerView) {
+            console.log("******RESULTS*******");
             console.log(results)
             if (highlight) {
               highlight.remove();
@@ -505,7 +508,7 @@
           stationLayerView
             .queryFeatures(query)
             .then(function (results) {
-              console.log("stations", results.features.length);
+              console.log("stations", results.length);
               stationLayerView.filter = {
                 geometry: query.geometry,
               };
@@ -524,6 +527,7 @@
                 watershed_dataset_array.push(results.features[index].attributes);
                 watershed_checkbox_array.push(results.features[index].attributes.dataset);
                 console.log("WATERSHED CHECKBOX QUERY")
+                console.log("length", watershed_checkbox_array.length);
                 console.log(watershed_checkbox_array)
               });
             });
@@ -619,6 +623,7 @@
               results.features.forEach(function (item, index) {
                 county_dataset_array.push(results.features[index].attributes);
                 county_checkbox_array.push(results.features[index].attributes.dataset);
+                datasetParameter = results;
                 console.log("WATERSHED CHECKBOX QUERY")
                 console.log(county_checkbox_array)
               });
@@ -889,13 +894,21 @@
 
         console.log("On To The Next Part...");
         str = " ";
-        checkedStations.forEach(function (item, index) {
-          console.log(`item: ${item}`);
-          str += retrieveData(item.stationid, item.origin_fname, item.dtp, item.link);
+        checkedStations.forEach(function (element, index_outer) {
+          county_dataset_array.forEach(function (dataset, index_inner) {
+            let myDataset = county_dataset_array[index_inner];
+            if (element.value == myDataset.dataset) {
+              retrieveData(myDataset.stationid, myDataset.origin_fname, myDataset.dtp, myDataset.link)
+            }
+            // else {
+            //   console.log(element.value, "---", county_dataset_array[index_inner].dtp);
+            // }
+          });
+          // str += retrieveData(item.stationid, item.origin_fname, item.dtp, item.link);
         });
 
-        console.log("it's working maybe?...")
-        console.log(str);
+        // console.log("it's working maybe?...")
+        // console.log(str);
       });
 
       // Clear Query Button (For All): 
