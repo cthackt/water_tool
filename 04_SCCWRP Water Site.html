@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="initial-scale=1, maximum-scale=1,user-scalable=no" />
+  <title>Water Checkbox (WIP)</title>
+
+  <style>
+    html,
+    body {
+      height: 100%;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    #viewDiv {
+      height: 90%;
+      width: 77.5%;
+    }
+
+    #viewDiv2 {
+      height: 90%;
+      width: 55%;
+    }
+
+    #downloadbutton {
+      padding: 20px;
+      width: 200px;
+      margin-top: 10%;
+    }
+
+    #titleDiv {
+      padding: 10px;
+    }
+
+    #resultsDiv {
+      overflow: auto;
+      display: none;
+    }
+
+    #infoDiv {
+      padding: 6px;
+      width: 370px;
+      height: 90%;
+      position: absolute;
+      top: 0px;
+      right: 0px;
+      --calcite-ui-brand: #71C96E;
+      --calcite-ui-brand-hover: #67B564;
+    }
+
+    .style-button {
+      margin: 3px;
+    }
+
+    #titleText {
+      font-size: 20pt;
+      font-weight: 60;
+      padding-bottom: 10px;
+    }
+
+    .result_containers fieldset {
+      padding-left: 20px;
+    }
+
+    .result_containers fieldset label {
+      margin-left: 14px;
+    }
+
+    .result_containers fieldset label input{
+      margin-left: -30px;
+    }
+  </style>
+
+  <link href="https://cdn.jsdelivr.net/npm/simple-datatables@latest/dist/style.css" rel="stylesheet" type="text/css">
+  <link rel="stylesheet" href="https://js.arcgis.com/4.22/esri/themes/dark/main.css" />
+
+  <script type="module" src="https://js.arcgis.com/calcite-components/1.0.0-beta.69/calcite.esm.js"></script>
+  <script nomodule="" src="https://js.arcgis.com/calcite-components/1.0.0-beta.69/calcite.js"></script>
+  <link rel="stylesheet" type="text/css" href="https://js.arcgis.com/calcite-components/1.0.0-beta.69/calcite.css" />
+
+  <script src="https://cdn.jsdelivr.net/npm/simple-datatables@latest" type="text/javascript"></script>
+  <script src="https://js.arcgis.com/4.22/"></script>
+
+  <script>
+
+    // Establish variables / empty lists needed:
+
+    // For Buffer query:
+    json_array = [];
+    buffer_array = [];
+    distance = 0.5;
+    units = "miles";
+
+    // For Watershed query:
+    watershed_dataset_array = [];
+    watershed_checkbox_array = [];
+
+    // For Bight query:
+    bight_dataset_array = [];
+    bight_checkbox_array = [];
+
+    // For County query:
+    county_dataset_array = [];
+    county_checkbox_array = [];
+
+    // Misc. variables for all queries:
+    var highlight;
+    let layerList;
+    let stationLayerView;
+    let countyLayerView;
+    let bightLayerView;
+    let waterLayerView;
+
+    var datasetParameter;
+
+    require([
+      "esri/Map",
+      "esri/Graphic",
+      "esri/geometry/Point",
+      "esri/views/MapView",
+      "esri/layers/FeatureLayer",
+      "esri/widgets/LayerList",
+      "esri/renderers/SimpleRenderer",
+      "esri/symbols/SimpleFillSymbol",
+      "esri/symbols/SimpleLineSymbol",
+      "esri/renderers/UniqueValueRenderer",
+      "esri/widgets/Legend",
+      "esri/widgets/BasemapGallery",
+      "esri/widgets/Expand",
+      "esri/core/watchUtils",
+      "esri/geometry/geometryEngineAsync",
+      "dojo/query",
+      "dojo/dom-style"
+    ], function (Map, Graphic, Point, MapView, FeatureLayer, LayerList, SimpleRenderer, SimpleLineSymbol, UniqueValueRenderer, SimpleFillSymbol, Legend, BasemapGallery, Expand, watchUtils, geometryEngineAsync, query, domStyle) {
+
+      // Quality Control Boards label + renderer + feature layer + add layer
+      const rwqcbLabel = ({
+        symbol: {
+          type: "text",  // autocasts as new TextSymbol()
+          color: "white",
+          font: {  // autocast as new Font()
+            family: "Playfair Display",
+            size: 12,
+            weight: "normal"
+          }
+        },
+        labelPlacement: "always-horizontal",
+        labelExpressionInfo: {
+          expression: "$feature.RBNAME"
+        },
+        deconflictionStrategy: "none"
+      });
+      const rwqcbRend = {
+        type: "simple",  // autocasts as new SimpleRenderer()
+        symbol: {
+          type: "simple-fill",  // autocasts as new SimpleFillSymbol()
+          color: [0, 76, 115, 0.1],
+          outline: {  // autocasts as new SimpleLineSymbol()
+            width: 2,
+            color: "brown"
+          }
+        }
+      };
+      const rwqcb = new FeatureLayer({
+        url: "https://gis.sccwrp.org/arcserver/rest/services/Hosted/Regional_Water_Quality_Control_Boards/FeatureServer", // Taken from sccwrp ArcOnline account
+        title: "Regional Water Quality Control Boards", // naming layer as it'll be seen on the legend + layerlist dropdown menu
+        renderer: rwqcbRend,
+        labelingInfo: rwqcbLabel,
+        visible: false,
+      });
+
+      // Watershed label + renderer + feature layer + add layer
+      const watershedLabel = ({
+        symbol: {
+          type: "text",  // autocasts as new TextSymbol()
+          color: "white",
+          font: {  // autocast as new Font()
+            family: "Playfair Display",
+            size: 12,
+            weight: "normal"
+          }
+        },
+        labelPlacement: "always-horizontal",
+        labelExpressionInfo: {
+          expression: "$feature.HRNAME"
+        },
+        deconflictionStrategy: "none"
+      });
+      const waterRend = {
+        type: "simple",  // autocasts as new SimpleRenderer()
+        symbol: {
+          type: "simple-fill",  // autocasts as new SimpleFillSymbol()
+          color: [0, 200, 200, 0.3],
+          outline: {  // autocasts as new SimpleLineSymbol()
+            width: 0.5,
+            color: "black"
+          }
+        }
+      };
+      const watersheds = new FeatureLayer({
+        url: "https://gis.sccwrp.org/arcserver/rest/services/Hosted/California_Watersheds/FeatureServer",
+        renderer: waterRend,
+        title: "Watersheds",
+        visible: false
+        //labelingInfo: watershedLabel
+      });
+
+      // Rivers label + renderer + feature layer + add layer
+      const priorityLabel = ({
+        symbol: {
+          type: "text",  // autocasts as new TextSymbol()
+          color: "white",
+          font: {  // autocast as new Font()
+            family: "Playfair Display",
+            size: 12,
+            weight: "normal"
+          }
+        },
+        labelPlacement: "center-along",
+        labelExpressionInfo: {
+          expression: "$feature.Actn_Rc"
+        },
+        deconflictionStrategy: "none"
+      });
+      const priRend = {
+        type: "unique-value",  // autocasts as new UniqueValueRenderer()
+        field: "Actn_Rc",
+        defaultSymbol: { type: "simple-fill" },  // autocasts as new SimpleFillSymbol()
+        uniqueValueInfos: [{
+          value: "Low Priority",
+          symbol: {
+            type: "simple-fill",  // autocasts as new SimpleFillSymbol()
+            color: "brown"
+          }
+        }, {
+          value: "Restoration & Management",
+          symbol: {
+            type: "simple-fill",
+            color: "orange"
+          }
+        }, {
+          value: "Management",
+          symbol: {
+            type: "simple-fill",
+            color: "blue"
+          }
+        }, {
+          value: "Restoration",
+          symbol: {
+            type: "simple-fill",
+            color: "green"
+          }
+        }, {
+          value: "Protection",
+          symbol: {
+            type: "simple-fill",
+            color: "yellow"
+          }
+        }]
+      };
+      const priority = new FeatureLayer({
+        url: "https://services1.arcgis.com/gfvMa5URH3rFRQ7T/arcgis/rest/services/StressorRating_Statewide_Median_ReachAction_R4_1_2/FeatureServer",
+        title: "Watershed Prioritization Recommended Actions",
+        renderer: priRend,
+        labelingInfo: priorityLabel,
+        visible: false,
+      });
+
+      // Bight layer
+      const bightRend = {
+        type: "simple",  // autocasts as new SimpleRenderer()
+        symbol: {
+          type: "simple-fill",  // autocasts as new SimpleFillSymbol()
+          color: [255, 255, 255, 0.3],
+          outline: {  // autocasts as new SimpleLineSymbol()
+            width: 0.5,
+            color: "white"
+          }
+        }
+      };
+      const bight = new FeatureLayer({
+        url: "https://gis.sccwrp.org/arcserver/rest/services/Hosted/Bight_Strata_2018/FeatureServer",
+        title: "Bight",
+        renderer: bightRend,
+        outFields: ["*"]
+      });
+
+      // Stations layer
+      let renderer = {
+        type: "unique-value",
+        field: "grp",
+        uniqueValueInfos: [{
+          value: "Projects",
+          symbol: {
+            size: 3,
+            type: "simple-marker",
+            color: "red",
+            outline: null
+          },
+          label: "Projects"
+        }, {
+          value: "Regional Monitoring",
+          symbol: {
+            size: 3,
+            type: "simple-marker",
+            color: "blue",
+            outline: null
+          },
+          label: "Regional Monitoring"
+        }]
+
+      };
+      const layer = new FeatureLayer({
+        portalItem: {
+          id: "4ce8725b7968421eaa945025e2eca221"
+        },
+        renderer: renderer,
+        title: "Stations",
+        outFields: ["*"]
+      });
+
+      // County layer
+      const countyLabel = ({
+        symbol: {
+          type: "text",  // autocasts as new TextSymbol()
+          color: "white",
+          font: {  // autocast as new Font()
+            family: "Playfair Display",
+            size: 12,
+            weight: "normal"
+          }
+        },
+        labelPlacement: "always-horizontal",
+        labelExpressionInfo: {
+          expression: "$feature.NAME_PCASE"
+        },
+        deconflictionStrategy: "none"
+      });
+      const countyRend = {
+        type: "simple",  // autocasts as new SimpleRenderer()
+        symbol: {
+          type: "simple-fill",  // autocasts as new SimpleFillSymbol()
+          color: [0, 76, 115, 0.1],
+          outline: {  // autocasts as new SimpleLineSymbol()
+            width: 1,
+            color: "white"
+          }
+        }
+      };
+      const county = new FeatureLayer({
+        url: "https://gis.sccwrp.org/arcserver/rest/services/Hosted/Counties/FeatureServer",
+        renderer: countyRend,
+        labelingInfo: countyLabel,
+        title: "County",
+        outFields: ["*"]
+      })
+
+      // Setting up map
+      const map = new Map({
+        basemap: "satellite",
+        layers: [layer, bight, county, rwqcb, watersheds]
+      });
+
+      // Take that new map we just made above and display it
+      var view = new MapView({
+        container: "viewDiv",
+        center: [-118.80840601482758, 34.699385602860495],
+        zoom: 10,
+        map: map,
+        popup: {
+          autoOpenEnabled: false,
+          dockEnabled: true,
+          dockOptions: {
+            // dock popup at bottom-right side of view
+            buttonEnabled: true,
+            breakpoint: false,
+            position: "bottom-left"
+          }
+        }
+      });
+
+      // Geting the LayerView created on the view for each respective layers:
+      // Stations, County, Bight, Watershed
+      view.whenLayerView(layer).then(function (lv) {
+        stationLayerView = lv;
+      });
+      view.whenLayerView(county).then(function (layerView) {
+        countyLayerView = layerView;
+      });
+      view.whenLayerView(bight).then(function (lv2) {
+        bightLayerView = lv2;
+      });
+      view.whenLayerView(watersheds).then(function (lv3) {
+        waterLayerView = lv3;
+      });
+
+      // Set the view extent to the data extent
+      layer.load().then(() => {
+        // view.extent = layer.fullExtent;
+        console.log("Now setting the view extent to the data extent...")
+        layer.popupTemplate = layer.createPopupTemplate();
+        loadLayerList();
+      });
+
+      function findLayerByTitle(title) {
+        return view.map.allLayers.find(function (layer) {
+          console.log("Layer Title Function is returning...")
+          console.log(layer.title);
+          return layer.title === title;
+        });
+      };
+
+      // Loading the empty json_array for buffer query
+      function loadLayerList() {
+        console.log("Loading LayerList...");
+        console.log(json_array);
+      };
+
+      // Functions to retrieve station data, format a table to view data, and stuff...
+      function formatTable(station, origin_fname, datatype, json) {
+        console.log("formatTable");
+        stationdiv = "#" + CSS.escape(station) + "-" + CSS.escape(datatype);
+        var el = document.querySelector(stationdiv);
+        console.log(el);
+        fieldnames = [];
+        fieldvalues = [];
+        Object.keys(json.fields).forEach(function (item) {
+          fieldnames.push(json.fields[item].name);
+        });
+        Object.keys(json.features).forEach(function (feature_index) {
+          fieldvalues[feature_index] = json.features[feature_index].attributes;
+        });
+        console.log(fieldnames);
+        console.log(fieldvalues);
+        if (json.fields != "empty") {
+          let table = new simpleDatatables.DataTable(stationdiv, {
+            data: {
+              headings: fieldnames,
+              data: fieldvalues.map(item => Object.values(item))
+            },
+          });
+        } else {
+          console.log("empty");
+        };
+      };
+      function retrieveData(station, origin_fname, datatype, url) {
+        console.log("retrieveData() called")
+        console.log("---------------------");
+        console.log("retrieveData() INPUT DATA:");
+        inputData = `station: ${station}, origin_fname: ${origin_fname}, url: ${url}`;
+        console.log(inputData);
+
+        h4 = ""
+        table = document.createElement("table"),
+          h4 = document.createElement("h4"),
+          table.id = station + "-" + datatype;
+        h4.innerHTML = table.id;
+        document.body.appendChild(h4);
+        document.body.appendChild(table);
+        search_url = url + "/query?where=" + origin_fname + "='" + station + "'&outFields=*&f=json";
+        console.log("search_url:" + search_url);
+        protocol = "GET";
+        fetch(search_url, { method: protocol, cache: "no-cache", })
+          .then(function (response) {
+             return response.json(); 
+            })
+            .then(function (data) { 
+              console.log(data); 
+              formatTable(station, origin_fname, datatype, data); 
+            })
+              .catch(function (err) { 
+                console.log("We had a problem Houston", err); 
+              });
+      };
+
+
+      // WATERSHED LAYER: Function that queries all stations within boundaries of a county from user click event
+      // WATERSHED LAYER: Query the county layer view for statistics on each analysis variable in the layer
+      // WATERSHED LAYER: Function to tell "query watershed" button what to do
+      view.on("click", function (event) {
+        queryFeatures4(event);
+      });
+      function queryFeatures4(screenPoint) {
+
+        const point = view.toMap(screenPoint);
+
+        // Printing out stuff in the console for user
+        console.log("click");
+        console.log(point);
+        console.log('Latitude', point.latitude);
+        console.log('Longitude', point.longitude);
+
+        // Query the watershed polygon where the user clicked on (can only click one at a time)
+        waterLayerView.filter = null;
+        waterLayerView.queryFeatures({
+          geometry: point,
+          spatialRelationship: "intersects",
+          returnGeometry: true,
+          outFields: ["*"]
+        }).then(function (results) {
+          if (!results.features.length) { return; }
+
+          // Highlight the watershed polygon area returned from the first query
+          view.whenLayerView(watersheds).then(function (layerView) {
+            console.log("******RESULTS*******");
+            console.log(results)
+            if (highlight) {
+              highlight.remove();
+            }
+            highlight = layerView.highlight(results.features);
+          });
+
+          // Query the for the related station point features for the watershed polygon feature ids found
+          var query = {
+            geometry: results.features[0].geometry
+          };
+          stationLayerView
+            .queryFeatures(query)
+            .then(function (results) {
+              console.log("stations", results.length);
+              stationLayerView.filter = {
+                geometry: query.geometry,
+              };
+
+              // open popup of station query result
+              console.log(query);
+              view.popup.open({
+                location: point,
+                features: results.features,
+                featureMenuOpen: true
+              });
+
+              // "Push" the results into the empty json_array variable
+              console.log("DEBUG FEATURE SET")
+              results.features.forEach(function (item, index) {
+                watershed_dataset_array.push(results.features[index].attributes);
+                watershed_checkbox_array.push(results.features[index].attributes.dataset);
+                console.log("WATERSHED CHECKBOX QUERY")
+                console.log("length", watershed_checkbox_array.length);
+                console.log(watershed_checkbox_array)
+              });
+            });
+        });
+      }
+      function queryLayerViewStats4(lv3) {
+        query = lv3.layer.createQuery();
+        query.geometry = lv3.extent;
+        return lv3.queryFeatures(query).then(function (response) {
+          stats = response.features[0].attributes;
+        });
+      };
+      document.querySelector('#query-watershed').addEventListener("click", function (event, ui) {
+
+        // Populating an empty array (water_checklist) with unique values from watershed_checkbox_array
+        const water_checklist = [...new Set(watershed_checkbox_array)]
+        console.log("WATERSHED CHECKBOX LIST")
+        console.log(water_checklist)
+
+        // select the div where we will put the checkboxes, and clear the contents before putting new stuff
+        const water_checkboxFieldset = document.querySelector('#water_results > fieldset');
+        console.log("water_checkboxFieldset")
+        water_checkboxFieldset.innerHTML = `<legend> Datasets From Watershed Query: </legend>`;
+        water_checklist.forEach(item => {
+          water_checkboxFieldset.innerHTML += `<label><input class = "stationChecked" type="checkbox" value="${item}">${item}</label><br>`
+        });
+        console.log(water_checkboxFieldset);
+
+        // str = " ";
+        // json_array.forEach(function (item, index) {
+        //   console.log(item);
+        //   str += retrieveData(item.stationid, item.origin_fname, item.dtp, item.link);
+        // });
+        // console.log(str);
+      });
+
+      // COUNTY LAYER: Function that queries all stations within boundaries of a county from user click event
+      // COUNTY LAYER: Query the county layer view for statistics on each analysis variable in the layer
+      // COUNTY LAYER: Function to tell "query county" button what to do
+      view.on("click", function (event) {
+        queryFeatures(event);
+      });
+      function queryFeatures(screenPoint) {
+
+        const point = view.toMap(screenPoint);
+
+        // Printing out stuff in the console for user
+        console.log("click");
+        console.log(point);
+        console.log('Latitude', point.latitude);
+        console.log('Longitude', point.longitude);
+
+        // Query the county polygon where the user clicked on (can only click one at a time)
+        countyLayerView.filter = null;
+        countyLayerView.queryFeatures({
+          geometry: point,
+          spatialRelationship: "intersects",
+          returnGeometry: true,
+          outFields: ["*"]
+        }).then(function (results) {
+          if (!results.features.length) { return; }
+
+          // Highlight the county polygon area returned from the first query
+          view.whenLayerView(county).then(function (layerView) {
+            console.log(results)
+            if (highlight) {
+              highlight.remove();
+            }
+            highlight = layerView.highlight(results.features);
+          });
+
+          // Query the for the related station point features for the county polygon feature ids found
+          var query = {
+            geometry: results.features[0].geometry
+          };
+          stationLayerView
+            .queryFeatures(query)
+            .then(function (results) {
+              console.log("stations", results.features.length);
+              stationLayerView.filter = {
+                geometry: query.geometry,
+              };
+              // open popup of station query result
+              console.log(query);
+              view.popup.open({
+                location: point,
+                features: results.features,
+                featureMenuOpen: true
+              });
+
+              // "Push" the results into the empty json_array variable
+              console.log("DEBUG FEATURE SET")
+              results.features.forEach(function (item, index) {
+                county_dataset_array.push(results.features[index].attributes);
+                county_checkbox_array.push(results.features[index].attributes.dataset);
+                datasetParameter = results;
+                console.log("WATERSHED CHECKBOX QUERY")
+                console.log(county_checkbox_array)
+              });
+
+
+            });
+        });
+      }
+      function queryLayerViewStats(layerView) {
+        query = layerView.layer.createQuery();
+        query.geometry = layerView.extent;
+        return layerView.queryFeatures(query).then(function (response) {
+          stats = response.features[0].attributes;
+        });
+      };
+      document.querySelector('#query-county').addEventListener("click", function (event, ui) {
+        // Populating an empty array (county_checklist) with unique values from county_checkbox_array
+        const county_checklist = [...new Set(county_checkbox_array)]
+        console.log("COUNTY CHECKBOX LIST")
+        console.log(county_checklist)
+
+        // select the div where we will put the checkboxes, and clear the contents before putting new stuff
+        const county_checkboxFieldset = document.querySelector('#county_results > fieldset');
+        console.log("County_checkboxFieldset")
+        county_checkboxFieldset.innerHTML = `<legend> Datasets From County Query: </legend>`;
+        county_checklist.forEach(item => {
+          county_checkboxFieldset.innerHTML += `<label><input class = "stationChecked" type="checkbox" value="${item}">${item}</label><br>`
+        });
+        console.log(county_checkboxFieldset);
+
+        // str = " ";
+        //   json_array.forEach(function (item, index) {
+        //     console.log(item);
+        //     str += retrieveData(item.stationid, item.origin_fname, item.dtp, item.link);
+        //   });
+        //   console.log(str);
+
+      });
+
+
+      // BIGHT LAYER: Function that queries all stations within a bight boundary from user click event
+      // BIGHT LAYER: Query the county layer view for statistics on each analysis variable in the layer
+      // BIGHT LAYER: Function to tell "query bight" button what to do
+      view.on("click", function (event) {
+        queryFeatures2(event);
+      });
+      function queryFeatures2(screenPoint) {
+
+        const point = view.toMap(screenPoint);
+
+        // Printing out stuff in the console for user
+        console.log("click");
+        console.log(point);
+        console.log('Latitude', point.latitude);
+        console.log('Longitude', point.longitude);
+
+        // Query the county polygon where the user clicked on (can only click one at a time)
+        bightLayerView.filter = null;
+        bightLayerView.queryFeatures({
+          geometry: point,
+          spatialRelationship: "intersects",
+          returnGeometry: true,
+          outFields: ["*"]
+        }).then(function (results) {
+          if (!results.features.length) { return; }
+
+          // Highlight the bight polygon area returned from the first query
+          view.whenLayerView(bight).then(function (layerView) {
+            console.log(results)
+            if (highlight) {
+              highlight.remove();
+            }
+            highlight = layerView.highlight(results.features);
+          });
+
+          // Query the for the related station point features for the bight polygon feature ids found
+          var query = {
+            geometry: results.features[0].geometry
+          };
+          stationLayerView
+            .queryFeatures(query)
+            .then(function (results) {
+              console.log("stations", results.features.length);
+              stationLayerView.filter = {
+                geometry: query.geometry,
+              };
+              // open popup of station query result
+              console.log(query);
+              view.popup.open({
+                location: point,
+                features: results.features,
+                featureMenuOpen: true
+              });
+              results.features.forEach(function (item, index) {
+                json_array.push(results.features[index].attributes);
+              });
+
+              // "Push" the results into the empty json_array variable
+              console.log("DEBUG FEATURE SET")
+              results.features.forEach(function (item, index) {
+                bight_dataset_array.push(results.features[index].attributes);
+                bight_checkbox_array.push(results.features[index].attributes.dataset);
+                console.log("BIGHT CHECKBOX QUERY")
+                console.log(bight_checkbox_array)
+              });
+            });
+        });
+      }
+      function queryLayerViewStats2(lv2) {
+        query = lv2.layer.createQuery();
+        query.geometry = lv2.extent;
+        return lv2.queryFeatures2(query).then(function (response) {
+          stats = response.features[0].attributes;
+        });
+      };
+      document.querySelector('#query-bight').addEventListener("click", function (event, ui) {
+
+        // Populating an empty array (bight_checklist) with unique values from bight_checkbox_array
+        const bight_checklist = [...new Set(bight_checkbox_array)]
+        // console.log("BIGHT CHECKBOX LIST")
+        console.log(bight_checklist)
+
+        // select the div where we will put the checkboxes, and clear the contents before putting new stuff
+        const bight_checkboxFieldset = document.querySelector('#bight_results > fieldset');
+        console.log("bight_checkboxFieldset")
+        
+        bight_checkboxFieldset.innerHTML = `<legend> Datasets From Bight Query: </legend>`;
+
+        bight_checklist.forEach(item => {
+          bight_checkboxFieldset.innerHTML += `<label><input class = "stationChecked" type="checkbox"  value="${item}">${item}</label><br>`
+        });
+        bight_checkboxFieldset.innerHTML += "";
+        console.log(bight_checkboxFieldset);
+
+        // str = " ";
+        // bight_checklist.forEach(function (item, index) {
+        //   console.log(item);
+        //   str += retrieveData(item.stationid, item.origin_fname, item.dtp, item.link);
+        // });
+        // console.log(str);
+
+      });
+
+      // POINT BUFFER: Create graphic for mouse point click
+      // POINT BUFFER: Create graphic for distance buffer
+      // POINT BUFFER: Get the screen point from the view's click event
+      // POINT BUFFER: Function that queries all stations within boundaries of a county from user click event
+      // POINT BUFFER: Query the county layer view for statistics on each analysis variable in the layer
+      // POINT BUFFER: Function to tell "query buffer" button what to do
+      const pointGraphic = new Graphic({
+        symbol: {
+          type: "simple-marker", // autocasts as new SimpleMarkerSymbol()
+          color: [0, 0, 139],
+          outline: {
+            color: [255, 255, 255],
+            width: 1.5
+          }
+        }
+      });
+      const bufferGraphic = new Graphic({
+        symbol: {
+          type: "simple-fill", // autocasts as new SimpleFillSymbol()
+          color: [173, 216, 230, 0.2],
+          outline: {
+            // autocasts as new SimpleLineSymbol()
+            color: [255, 255, 255],
+            width: 1
+          }
+        }
+      });
+      view.on("click", (event) => {
+        view.graphics.remove(pointGraphic);
+        if (view.graphics.includes(bufferGraphic)) {
+          view.graphics.remove(bufferGraphic);
+        }
+        queryFeatures3(event);
+      });
+      function queryFeatures3(screenPoint) {
+        console.log("click:");
+        const point = view.toMap(screenPoint);
+        console.log(point);
+        console.log(point.latitude);
+        console.log(point.longitude);
+
+        // Querying the station layer for points
+        layer
+          .queryFeatures({
+            geometry: point,
+            distance: distance,
+            units: units,
+            spatialRelationship: "intersects",
+            returnGeometry: false,
+            returnQueryGeometry: true,
+            outFields: ["*"]
+          })
+          .then((featureSet) => {
+            // set graphic location to mouse pointer and add to mapview
+            pointGraphic.geometry = point;
+            view.graphics.add(pointGraphic);
+            // open popup of query result
+
+            console.log(featureSet);
+            view.popup.open({
+              location: point,
+              features: featureSet.features,
+              featureMenuOpen: true
+            });
+            if (featureSet.queryGeometry) {
+              bufferGraphic.geometry = featureSet.queryGeometry;
+              view.graphics.add(bufferGraphic);
+            }
+            // NEW STUFF CIRCA 2/4/2022
+            // Pushing the list of stations from buffer query to empty array (json_array)
+            // Populating an empty array (buffer_array) with dataset names taken from stations list (json_array)
+            console.log("DEBUG FEATURE SET")
+            console.log(featureSet.features)
+            featureSet.features.forEach(function (item, index) {
+              json_array.push(featureSet.features[index].attributes);
+              buffer_array.push(featureSet.features[index].attributes.dataset);
+              console.log("DATASETS FROM POINT BUFFER QUERY")
+              console.log(buffer_array)
+            });
+          });
+      };
+      function queryLayerViewStats3(layerView) {
+        query = layerView.layer.createQuery();
+        query.geometry = layerView.extent;
+        return layerView.queryFeatures3(query).then(function (response) {
+          stats = response.features[0].attributes;
+        });
+      };
+      document.querySelector('#query-buffer').addEventListener("click", function (event, ui) {
+        // str = " ";
+        // json_array.forEach(function (item, index) {
+        //   console.log(item);
+        //   str += retrieveData(item.stationid, item.origin_fname, item.dtp, item.link);
+        // });
+        // console.log(str);
+
+        // Populating an empty array (buffer_checklist) with unique values from buffer_array
+        const buffer_checklist = [...new Set(buffer_array)]
+        console.log("BUFFER CHECKLIST")
+        console.log(buffer_checklist)
+        console.log("for sure this works")
+
+        // select the div where we will put the checkboxes, and clear the contents before putting new stuff
+        const checkboxFieldset = document.querySelector('#results > fieldset');
+        checkboxFieldset.innerHTML = `<legend> Datasets From Point Buffer Query:</legend>`;
+        buffer_checklist.forEach(item => {
+          checkboxFieldset.innerHTML += `<label><input class = "stationChecked" type="checkbox" value="${item}">${item}</label><br>`
+        });
+        console.log(checkboxFieldset);
+      });
+
+      // View Selected Checked Stations Button Function
+      document.querySelector('#web-tables').addEventListener("click", function (event, ui) {
+
+        const els = document.getElementsByClassName('stationChecked');
+        //const checkedStations = newArray.from(els).filter((e) => { return e.checked });
+
+        let checkedStations = [];
+        for (let e of els) {
+          if(e.checked){
+            checkedStations.push(e)
+          }
+        };
+
+        console.log("stationChecked:");
+        console.log("---------------");
+        checkedStations.forEach(el => console.log(el));
+
+        console.log("On To The Next Part...");
+        str = " ";
+        checkedStations.forEach(function (element, index_outer) {
+          county_dataset_array.forEach(function (dataset, index_inner) {
+            let myDataset = county_dataset_array[index_inner];
+            if (element.value == myDataset.dataset) {
+              retrieveData(myDataset.stationid, myDataset.origin_fname, myDataset.dtp, myDataset.link)
+            }
+            // else {
+            //   console.log(element.value, "---", county_dataset_array[index_inner].dtp);
+            // }
+          });
+          // str += retrieveData(item.stationid, item.origin_fname, item.dtp, item.link);
+        });
+
+        // console.log("it's working maybe?...")
+        // console.log(str);
+      });
+
+      // Download Data
+      document.querySelector("#downloadbutton").addEventListener("click", (e) => {
+        let obj = {};
+        let elements = document.getElementsByClassName('stationChecked');
+        let checkedStations = [];
+        
+        for (let e of elements) {
+          if(e.checked){
+            checkedStations.push(e)
+          }
+        };
+
+        checkedStations.forEach((element, index) => {
+          let datatype = element.value;
+          county_dataset_array.forEach(function (dataset, index_inner) {
+            let myDataset = county_dataset_array[index_inner];
+            if (element.value == myDataset.dataset) {
+              console.log("====MY==DATASET====", "\n", myDataset.dataset);
+              obj[index] = {
+                table: datatype
+              }
+            }
+          });
+        });
+
+      });
+
+      // Clear Query Button (For All): 
+      document.getElementById("clear-query").addEventListener("click", () => {
+        view.popup.close();
+        // document.getElementById("resultsHeading").innerHTML = `Results`;
+        document.getElementById("results").innerHTML = "";
+        document.getElementById("water_results").innerHTML = "";
+        document.getElementById("county_results").innerHTML = "";
+        document.getElementById("bight_results").innerHTML = "";
+      });
+
+      var layerlist = new LayerList({ // this right here creates a layerlist or "dropdown" menu so that one can toggle off / on any of the layers that are present
+        view: view
+      });
+      var basemapGallery = new BasemapGallery({ // This right here provides the gallery of basemaps users can pull from. I think.
+        view: view,
+        container: document.createElement("div")
+      });
+      var bgExpand = new Expand({ // This gives users the ability to choose which basemap they want to use
+        view: view,
+        content: basemapGallery
+      });
+      var legend = new Expand({ // not gonna lie bro, I have no idea how this creates the legend.
+        content: new Legend({
+          view: view,
+          style: "classic"
+        }),
+        view: view,
+        expanded: false
+      });
+
+      // Adding Dropdown menu, SCCWRP title, buttons, legend, basemaps, etc to map
+      view.ui.add("titleDiv", "top-right");
+      view.ui.add(layerlist, "top-right");
+      view.ui.add(bgExpand, "top-left");
+      view.ui.add(legend, "top-left");
+      //view.ui.add("topbar", "bottom-left");
+
+    });
+  </script>
+</head>
+
+<body>
+
+  <div id="viewDiv"></div>
+  <div id="viewDiv2"></div>
+
+  <div id="titleDiv" class="esri-widget">
+    <div id="titleText">SCCWRP California Water Data </div>
+  </div>
+
+  <calcite-panel id="infoDiv" class="calcite-theme-dark">
+
+    <h3 class="heading" slot="header-content">
+      Catalog Query Filters
+    </h3>
+
+    <div id="content" style="padding: 5px">
+
+      <div style="width: 360px; max-width: 100%; display: flex; flex-direction: row;">
+
+        <calcite-button class="downloadall" id="query-buffer" width="half" appearance="outline" alignment="center"
+          scale="s">
+          Query 0.5mi Radius
+        </calcite-button>
+
+        <calcite-button class="downloadall" id="query-county" width="half" appearance="outline" alignment="center"
+          scale="s">
+          Query County Boundary
+        </calcite-button>
+
+        <calcite-button class="downloadall" id="query-bight" width="half" appearance="outline" alignment="center"
+          scale="s">
+          Query Bight Boundary
+        </calcite-button>
+
+        <calcite-button class="downloadall" id="query-watershed" width="half" appearance="outline" alignment="center"
+          scale="s">
+          Query Watershed Boundary
+        </calcite-button>
+
+        <calcite-button id="clear-query" width="half" appearance="outline" alignment="center" scale="s">
+          Clear All Queries!
+        </calcite-button>
+
+      </div>
+      <br />
+
+    </div>
+
+    <div id="results" class="result_containers">
+      <h3 class="heading" id="resultsHeading" slot="header-content"> Buffer Results </h3>
+      <fieldset class="fieldset-checkbox"></fieldset>
+    </div>
+
+    <div id="county_results" class="result_containers">
+      <h3 class="heading" id="resultsHeading" slot="header-content"> County Results </h3>
+      <fieldset class="fieldset-checkbox"></fieldset>
+    </div>
+
+    <div id="bight_results" class="result_containers">
+      <h3 class="heading" id="resultsHeading" slot="header-content"> Bight Results </h3>
+      <fieldset class="fieldset-checkbox"></fieldset>
+    </div>
+
+    <div id="water_results" class="result_containers">
+      <h3 class="heading" id="resultsHeading" slot="header-content"> Watershed Results </h3>
+      <fieldset class="fieldset-checkbox"></fieldset>
+    </div>
+
+    <div id="downloadbutton">
+      <calcite-button width="half" appearance="outline" alignment="center" scale="s" style="float: right">
+        Download Selected Datasets
+      </calcite-button>
+
+      <div id="web-tables">
+        <calcite-button width="half" appearance="outline" alignment="center" scale="s" style="float: left">
+          View<br>Tables<br>Online
+        </calcite-button>
+
+    </div>
+
+  </calcite-panel>
+
+</body>
+
+</html>
