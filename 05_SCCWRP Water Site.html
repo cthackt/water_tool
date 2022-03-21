@@ -60,6 +60,18 @@
       font-weight: 60;
       padding-bottom: 10px;
     }
+
+    .result_containers fieldset {
+      padding-left: 20px;
+    }
+
+    .result_containers fieldset label {
+      margin-left: 14px;
+    }
+
+    .result_containers fieldset label input{
+      margin-left: -30px;
+    }
   </style>
 
   <link href="https://cdn.jsdelivr.net/npm/simple-datatables@latest/dist/style.css" rel="stylesheet" type="text/css">
@@ -354,7 +366,7 @@
       var view = new MapView({
         container: "viewDiv",
         center: [-118.243683, 36.052235],
-        zoom: 6,
+        zoom: 8,
         map: map,
         popup: {
           autoOpenEnabled: false,
@@ -652,7 +664,7 @@
         console.log("County_checkboxFieldset")
         county_checkboxFieldset.innerHTML = `<legend> Datasets From County Query: </legend>`;
         county_checklist.forEach(item => {
-          county_checkboxFieldset.innerHTML += `<label><input class = "stationChecked" type="checkbox">${item}</label>`
+          county_checkboxFieldset.innerHTML += `<label><input class = "stationChecked" type="checkbox" value="${item}">${item}</label><br>`
         });
         console.log(county_checkboxFieldset);
 
@@ -875,43 +887,73 @@
         const checkboxFieldset = document.querySelector('#results > fieldset');
         checkboxFieldset.innerHTML = `<legend> Datasets From Point Buffer Query:</legend>`;
         buffer_checklist.forEach(item => {
-          checkboxFieldset.innerHTML += `<label><input class = "stationChecked" type="checkbox">${item}</label>`
+          checkboxFieldset.innerHTML += `<label><input class = "stationChecked" type="checkbox" value="${item}">${item}</label><br>`
         });
         console.log(checkboxFieldset);
       });
 
-      // Return Selected Checked Stations Button Function
-      document.querySelector('#downloadbutton').addEventListener("click", function (event, ui) {
+      // View Selected Checked Stations Button Function
+      document.querySelector('#web-tables').addEventListener("click", function (event, ui) {
 
-        const els = document.getElementsByClassName('stationChecked');
+const els = document.getElementsByClassName('stationChecked');
+//const checkedStations = newArray.from(els).filter((e) => { return e.checked });
 
-        // const checkedStations = Array.from(els).filter((e) => { return e.checked });
+let checkedStations = [];
+for (let e of els) {
+  if(e.checked){
+    checkedStations.push(e)
+  }
+};
 
-        const checkedStations = [];
+console.log("stationChecked:");
+console.log("---------------");
+checkedStations.forEach(el => console.log(el));
 
-        console.log("THIS IS THE EE")
-        for (let e of els) {
-          if(e.checked){
-            checkedStations.push(e)
-            console.log(e)
-          }
-        };
+console.log("On To The Next Part...");
+str = " ";
+checkedStations.forEach(function (element, index_outer) {
+  county_dataset_array.forEach(function (dataset, index_inner) {
+    let myDataset = county_dataset_array[index_inner];
+    if (element.value == myDataset.dataset) {
+      retrieveData(myDataset.stationid, myDataset.origin_fname, myDataset.dtp, myDataset.link)
+    }
+    // else {
+    //   console.log(element.value, "---", county_dataset_array[index_inner].dtp);
+    // }
+  });
+  // str += retrieveData(item.stationid, item.origin_fname, item.dtp, item.link);
+});
 
+// console.log("it's working maybe?...")
+// console.log(str);
+});
 
+// Download Data
+document.querySelector("#downloadbutton").addEventListener("click", (e) => {
+let obj = {};
+let elements = document.getElementsByClassName('stationChecked');
+let checkedStations = [];
 
-        console.log("stationChecked");
-        console.log(checkedStations);
+for (let e of elements) {
+  if(e.checked){
+    checkedStations.push(e)
+  }
+};
 
-        console.log("On To The Next Part...");
-        str = " ";
-        checkedStations.forEach(function (item, index) {
-          console.log(item);
-          str += retrieveData(item.dataset.stationid, item.dataset.origin_fname, item.dataset.dtp, item.dataset.link);
-        });
+checkedStations.forEach((element, index) => {
+  let datatype = element.value;
+  county_dataset_array.forEach(function (dataset, index_inner) {
+    let myDataset = county_dataset_array[index_inner];
+    if (element.value == myDataset.dataset) {
+      console.log("====MY==DATASET====", "\n", myDataset.dataset);
+      obj[index] = {
+        table: datatype
+      }
+    }
+  });
+});
 
-        console.log("it's working maybe?...")
-        console.log(str);
-      });
+});
 
       // Clear Query Button (For All): 
       document.getElementById("clear-query").addEventListener("click", () => {
@@ -1002,22 +1044,22 @@
 
     </div>
 
-    <div id="results">
+    <div id="results" class="result_containers">
       <h3 class="heading" id="resultsHeading" slot="header-content"> Buffer Results </h3>
       <fieldset class="fieldset-checkbox"></fieldset>
     </div>
 
-    <div id="county_results">
+    <div id="county_results" class="result_containers">
       <h3 class="heading" id="resultsHeading" slot="header-content"> County Results </h3>
       <fieldset class="fieldset-checkbox"></fieldset>
     </div>
 
-    <div id="bight_results">
+    <div id="bight_results" class="result_containers">
       <h3 class="heading" id="resultsHeading" slot="header-content"> Bight Results </h3>
       <fieldset class="fieldset-checkbox"></fieldset>
     </div>
 
-    <div id="water_results">
+    <div id="water_results" class="result_containers">
       <h3 class="heading" id="resultsHeading" slot="header-content"> Watershed Results </h3>
       <fieldset class="fieldset-checkbox"></fieldset>
     </div>
@@ -1026,6 +1068,11 @@
       <calcite-button width="half" appearance="outline" alignment="center" scale="s" style="float: right">
         Download Selected Datasets
       </calcite-button>
+
+      <div id="web-tables">
+        <calcite-button width="half" appearance="outline" alignment="center" scale="s" style="float: left">
+          View<br>Tables<br>Online
+        </calcite-button>
 
     </div>
 
